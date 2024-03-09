@@ -1,44 +1,49 @@
 package main
 
 import (
-    "bufio"
-    "fmt"
-    "io/ioutil"
-    "net/http"
-    "os"
+	"bufio"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"strings"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/microcosm-cc/bluemonday"
 )
 
 func main() {
-    // Create a new reader, assuming input will come from the standard input device
-    reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(os.Stdin)
 
-    fmt.Print("Enter URL: ")
-    url, err := reader.ReadString('\n') // Read the input until the first newline character
-    if err != nil {
-        fmt.Println("Error reading URL: ", err)
-        return
-    }
+	fmt.Print("Enter URL: ")
+	url, err := reader.ReadString('\n')
+	if err != nil {
+		log.Fatal("Error reading URL: ", err)
+	}
 
-    // Trim the newline character from the URL, which is read as part of the input
-    // This step is important because different operating systems have different newline characters
-    url = url[:len(url)-1]
+	url = strings.TrimSpace(url)
 
-    // Fetch the URL
-    resp, err := http.Get(url)
-    if err != nil {
-        fmt.Println("Error fetching URL: ", err)
-        return
-    }
-    defer resp.Body.Close()
+	// Make HTTP GET request
+	response, err := http.Get(url)
+	if err != nil {
+		log.Fatal("Error fetching URL: ", err)
+	}
+	defer response.Body.Close()
 
-    // Read the response body
-    body, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        fmt.Println("Error reading response body: ", err)
-        return
-    }
+	// Create a goquery document from the HTTP response
+	document, err := goquery.NewDocumentFromReader(response.Body)
+	if err != nil {
+		log.Fatal("Error loading HTTP response body: ", err)
+	}
 
-    // Convert the body to a string (this contains the HTML)
-    htmlContent := string(body)
-    fmt.Println(htmlContent)
+	// Use bluemonday to sanitize the document
+	p := bluemonday.StrictPolicy()
+	html, err := document.Html()
+	if err != nil {
+		log.Fatal("Error generating HTML: ", err)
+	}
+	text := p.Sanitize(html)
+
+	// Print out the sanitized text
+	fmt.Println(text)
 }
